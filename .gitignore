@@ -1,0 +1,8 @@
+HELP.md
+/work/
+*.code-workspace
+
+
+### VS Code ###
+.vscode/
+

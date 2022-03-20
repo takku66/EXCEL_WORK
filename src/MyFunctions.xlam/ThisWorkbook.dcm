@@ -1,0 +1,39 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "ThisWorkbook"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
+Attribute VB_Exposed = True
+Option Explicit
+
+Private Sub Workbook_Open()
+    Dim cmndBar As CommandBar
+    Set cmndBar = Application.CommandBars.Add(name:="My Functions")
+    cmndBar.Visible = True
+
+    'コマンドバーにメニューを追加
+    Dim 図形管理ボタン As CommandBarButton
+    Set 図形管理ボタン = cmndBar.Controls.Add(Type:=msoControlButton)
+    With 図形管理ボタン
+        .Style = msoButtonIconAndCaption
+        .FaceId = 8
+        .Caption = "図形管理"
+        .OnAction = "CREATE_AUTOSHAPE_MANAGER"
+    End With
+    
+    Dim ヘルプボタン As CommandBarButton
+    Set ヘルプボタン = cmndBar.Controls.Add(Type:=msoControlButton)
+    With ヘルプボタン
+        .Style = msoButtonIconAndCaption
+        .FaceId = 5
+        .Caption = "MFヘルプ"
+        .OnAction = "SHOW_MF_HELP"
+    End With
+End Sub
+
+Private Sub Workbook_BeforeClose(Cancel As Boolean)
+    Application.CommandBars("My Functions").Delete
+End Sub
