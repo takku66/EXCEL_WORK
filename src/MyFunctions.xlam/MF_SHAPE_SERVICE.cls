@@ -10,25 +10,33 @@ Attribute VB_Exposed = False
 Option Explicit
 
 
-Public Sub CREATE_MFSHAPE(reflectSht As Worksheet, name As String, content As String, hyperlink As String, subhyperlink As String, template As Shape)
+Public Sub CREATE_MFSHAPE(autoshapeMap As Object, reflectSht As Worksheet, name As String, content As String, hyperlink As String, subhyperlink As String, template As Shape)
     
-    Dim mf_shp As MF_SHAPE_DATA
+    Dim mf_shp As Variant
+    Dim mf_shplist() As MF_SHAPE_DATA
     
     ' 名前で図形を検索し、
     ' 存在していれば、プロパティを更新
     ' 存在していなければ、引数のテンプレートを元に、新しく図形を作成する
-    Set mf_shp = FIND_SHAPE_OF_ALL(name)
-    
-    If mf_shp Is Nothing Then
-        Set mf_shp = New MF_SHAPE_DATA
-        Call mf_shp.SET_SHEET(reflectSht)
+    If autoshapeMap.Exists(name) Then
+        ReDim mf_shplist(0 To UBound(autoshapeMap.Item(name)))
+        mf_shplist = autoshapeMap.Item(name)
+    Else
+        ReDim mf_shplist(0)
+        Set mf_shplist(0) = New MF_SHAPE_DATA
     End If
-    Call mf_shp.SET_NAME(name)
-    Call mf_shp.SET_CONTENT(content)
-    Call mf_shp.SET_HYPERLINK(hyperlink)
-    Call mf_shp.SET_SUBHYPERLINK(subhyperlink)
     
-    Set CREATE_MFSHAPE = REFLECT_SHAPE(mf_shp, template)
+    For Each mf_shp In mf_shplist
+        If mf_shp.GET_SHEET Is Nothing Then
+            Call mf_shp.SET_SHEET(reflectSht)
+        End If
+        Call mf_shp.SET_NAME(name)
+        Call mf_shp.SET_CONTENT(content)
+        Call mf_shp.SET_HYPERLINK(hyperlink)
+        Call mf_shp.SET_SUBHYPERLINK(subhyperlink)
+        
+        Set mf_shp = REFLECT_SHAPE(mf_shp, template)
+    Next mf_shp
 
 End Sub
 
@@ -43,38 +51,41 @@ Public Function CHANGE_HYPERLINK(mf_shp As MF_SHAPE_DATA, hyperlink As String)
 End Function
 
 
-' 指定されたシート・名前の図形を取得する
-Public Function FIND_SHAPE_OF_SHEET(sht As Worksheet, name As String)
-On Error GoTo NOT_FOUND
-    Set FIND_SHAPE_OF_SHEET = sht.Shapes(name)
-    Exit Function
-NOT_FOUND:
-    Set FIND_SHAPE_OF_SHEET = Nothing
-    Exit Function
-End Function
 
-Public Function FIND_SHAPE_OF_ALL(name As String) As MF_SHAPE_DATA
+Public Sub CacheAutoShapeMap(mf_autoshape_map As Object)
     Dim sht As Worksheet
     Dim shp As Shape
     Dim mf_shp As MF_SHAPE_DATA
-    Set mf_shp = New MF_SHAPE_DATA
+    Dim mf_shplist() As MF_SHAPE_DATA
+    
+    Dim name As String
     For Each sht In ActiveWorkbook.Sheets
-        Set shp = FIND_SHAPE_OF_SHEET(sht, name)
-        If shp Is Nothing Then
-            GoTo Continue
-        Else
+        For Each shp In sht.Shapes
+        
+            name = shp.name
+            
+            Set mf_shp = New MF_SHAPE_DATA
             Call mf_shp.SET_SHAPE(shp)
             Call mf_shp.SET_SHEET(sht)
-            Set FIND_SHAPE_OF_ALL = mf_shp
-            Exit Function
-        End If
-Continue:
-    Next sht
-End Function
+            
+            If mf_autoshape_map.Exists(name) Then
+                mf_shplist = mf_autoshape_map.Item(name)
+                ReDim Preserve mf_shplist(UBound(mf_shplist) + 1)
+                Set mf_shplist(UBound(mf_shplist)) = mf_shp
+                mf_autoshape_map.Remove name
+                mf_autoshape_map.Add name, mf_shplist
+            Else
+                ReDim mf_shplist(0)
+                Set mf_shplist(0) = mf_shp
+                mf_autoshape_map.Add name, mf_shplist
+            End If
 
+        Next shp
+    Next sht
+End Sub
 
 ' 図形情報を反映させる
-Private Function REFLECT_SHAPE(mf_shp As MF_SHAPE_DATA, template As Shape)
+Private Function REFLECT_SHAPE(mf_shp As Variant, template As Shape)
 
     Dim copyShp As Shape
     If mf_shp.GET_SHAPE Is Nothing Then

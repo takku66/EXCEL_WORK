@@ -87,3 +87,22 @@ End Sub
 '=============================================
 
 
+Public Sub execCache()
+    Dim obj As Object
+    Set obj = CreateObject("Scripting.Dictionary")
+    
+    Dim svc As MF_SHAPE_SERVICE
+    Set svc = New MF_SHAPE_SERVICE
+    Call svc.CacheAutoShapeMap(obj)
+    
+    Dim Key As Variant
+    For Each Key In obj.Keys
+        Debug.Print Key
+        Debug.Print IsArray(obj.Item(Key))
+        
+        Dim tmp As Variant
+        For Each tmp In obj.Item(Key)
+            Debug.Print tmp.GET_SHAPE.name
+        Next tmp
+    Next Key
+End Sub

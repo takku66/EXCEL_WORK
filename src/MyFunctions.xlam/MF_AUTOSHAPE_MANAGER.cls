@@ -23,6 +23,8 @@ Private CONTROL_SHEET As Worksheet
 ' 図形を扱うサービスクラス
 Private mf_shp_service As MF_SHAPE_SERVICE
 
+Dim mf_autoshape_map As Object
+
 
 ' 各管理機能に必要な、各情報の列位置や、読み取り開始位置を定義する
 Const NAME_COL = 1
@@ -44,6 +46,7 @@ Const DEFAULT_CONTROL_SHEETNAME = "_ASCSHT_"
 
 
 
+
 '******************************
 ' 初期化処理
 '
@@ -56,7 +59,9 @@ Public Sub Class_Initialize()
         CREATE_TEMPLATE_SHEET
     End If
     
+    Set mf_autoshape_map = CreateObject("Scripting.Dictionary")
     Set mf_shp_service = New MF_SHAPE_SERVICE
+    Call mf_shp_service.CacheAutoShapeMap(mf_autoshape_map)
     
 End Sub
 Public Sub ACTIVATE()
@@ -252,7 +257,8 @@ Public Sub REFLECT_AUTOSHAPE()
         subhyperlink = CONTROL_SHEET.Cells(loopCnt, SUBHYPERLINK_COL).Value
         Set template = SHAPE_INCELL(CONTROL_SHEET.Cells(loopCnt, TEMPLATE_AUTOSHAPE_COL))
         
-        Call mf_shp_service.CREATE_MFSHAPE(CONTROL_SHEET, name, content, hyperlink, subhyperlink, template)
+        Call mf_shp_service.CacheAutoShapeMap(mf_autoshape_map)
+        Call mf_shp_service.CREATE_MFSHAPE(mf_autoshape_map, CONTROL_SHEET, name, content, hyperlink, subhyperlink, template)
         
     Next loopCnt
 End Sub
