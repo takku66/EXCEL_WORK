@@ -58,11 +58,16 @@ Public Sub CacheAutoShapeMap(mf_autoshape_map As Object)
     Dim mf_shp As MF_SHAPE_DATA
     Dim mf_shplist() As MF_SHAPE_DATA
     
+    Set mf_autoshape_map = CreateObject("Scripting.Dictionary")
+    
     Dim name As String
     For Each sht In ActiveWorkbook.Sheets
         For Each shp In sht.Shapes
         
             name = shp.name
+            If name Like "__MFCTRL_*" Then
+                Continue
+            End If
             
             Set mf_shp = New MF_SHAPE_DATA
             Call mf_shp.SET_SHAPE(shp)
@@ -79,7 +84,7 @@ Public Sub CacheAutoShapeMap(mf_autoshape_map As Object)
                 Set mf_shplist(0) = mf_shp
                 mf_autoshape_map.Add name, mf_shplist
             End If
-
+Continue:
         Next shp
     Next sht
 End Sub
@@ -93,7 +98,7 @@ Private Function REFLECT_SHAPE(mf_shp As Variant, template As Shape)
         Set copyShp = template.Duplicate
         With copyShp
             .name = mf_shp.GET_NAME
-            .TextFrame2.TextRange.Characters.Text = mf_shp.GET_CONTENT
+            .TEXTFRAME2.TextRange.Characters.Text = mf_shp.GET_CONTENT
             .Top = 0
             .Left = 400
             .Width = 100
@@ -103,7 +108,7 @@ Private Function REFLECT_SHAPE(mf_shp As Variant, template As Shape)
         ' çXêV
         Set copyShp = mf_shp.GET_SHAPE
         With copyShp
-            .TextFrame2.TextRange.Characters.Text = mf_shp.GET_CONTENT
+            .TEXTFRAME2.TextRange.Characters.Text = mf_shp.GET_CONTENT
         End With
     End If
     
@@ -111,6 +116,10 @@ Private Function REFLECT_SHAPE(mf_shp As Variant, template As Shape)
                                 Anchor:=copyShp, _
                                 Address:=mf_shp.GET_HYPERLINK, _
                                 SubAddress:=mf_shp.GET_SUBHYPERLINK
+                                
+    If mf_shp.GET_HYPERLINK = "" And mf_shp.GET_SUBHYPERLINK = "" Then
+        copyShp.hyperlink.Delete
+    End If
                                 
     Call mf_shp.SET_SHAPE(copyShp)
     Set REFLECT_SHAPE = mf_shp

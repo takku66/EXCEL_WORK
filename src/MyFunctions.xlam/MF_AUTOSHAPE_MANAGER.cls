@@ -47,10 +47,11 @@ Const DEFAULT_CONTROL_SHEETNAME = "_ASCSHT_"
 
 
 
-'******************************
+' ==============================
 ' 初期化処理
-'
-'******************************
+' ==============================
+
+' 初期化
 Public Sub Class_Initialize()
 
     If IS_EXIST_CONTROL_SHEET Then
@@ -64,12 +65,18 @@ Public Sub Class_Initialize()
     Call mf_shp_service.CacheAutoShapeMap(mf_autoshape_map)
     
 End Sub
+
+' シートをアクティブ化して表示させる
 Public Sub ACTIVATE()
     CONTROL_SHEET.ACTIVATE
 End Sub
+
+' 管理表の名前を取得する
 Public Function GET_SHEET_NAME()
     GET_SHEET_NAME = CONTROL_SHEET.name
 End Function
+
+' 管理表が存在しているか
 Public Function IS_EXIST_CONTROL_SHEET()
     IS_EXIST_CONTROL_SHEET = False
     Dim ws As Worksheet
@@ -83,8 +90,11 @@ End Function
 
 
 
+' ==============================
+' 管理シートのテンプレート作成
+' ==============================
 
-' 管理シートのテンプレートを作成する
+' 最上位メソッド
 Public Sub CREATE_TEMPLATE_SHEET()
 
     ' シートの追加
@@ -95,13 +105,16 @@ Public Sub CREATE_TEMPLATE_SHEET()
     CREATE_CONTROL_LIST
     
     ' シート内にボタンを配置
-    ' 収集ボタン
-    ' ボタンの置換
+    ' 　・図形の収集と更新
+    ' 　・図形の作成と置換
     CREATE_CONTROL_BUTTONS
 End Sub
 
-' 管理表を作成
+
+' 管理表の一覧表を作成する
 Private Sub CREATE_CONTROL_LIST()
+
+    ' 各表項目のタイトル名や、幅を設定する
     CONTROL_SHEET.Cells(TITLE_ROW, NAME_COL).Value = NAME_TITLE
     CONTROL_SHEET.Cells(TITLE_ROW, CONTENT_COL).Value = CONTENT_TITLE
     CONTROL_SHEET.Cells(TITLE_ROW, HYPERLINK_COL).Value = HYPERLINK_TITLE
@@ -111,13 +124,16 @@ Private Sub CREATE_CONTROL_LIST()
     Columns(CONTENT_COL).ColumnWidth = 30
     Columns(HYPERLINK_COL).ColumnWidth = 50
     Columns(SUBHYPERLINK_COL).ColumnWidth = 30
-    Rows.RowHeight = 30
+    Columns(TEMPLATE_AUTOSHAPE_COL).ColumnWidth = 20
+    Rows.RowHeight = 40
     
+    ' 表のスタイル定義範囲を、Rangeで取得しておく
     Dim area As Range
     Dim titleArea As Range
     Set area = CONTROL_SHEET.Range(CONTROL_SHEET.Cells(TITLE_ROW, NAME_COL), CONTROL_SHEET.Cells(READ_ROW + 200, TEMPLATE_AUTOSHAPE_COL))
     Set titleArea = CONTROL_SHEET.Range(CONTROL_SHEET.Cells(TITLE_ROW, NAME_COL), CONTROL_SHEET.Cells(TITLE_ROW, TEMPLATE_AUTOSHAPE_COL))
     
+    ' 罫線周りの設定
     area.Borders(xlDiagonalDown).LineStyle = xlNone
     area.Borders(xlDiagonalUp).LineStyle = xlNone
     With area.Borders(xlEdgeLeft)
@@ -180,12 +196,13 @@ End Sub
 ' 管理用のボタンを配置する
 Private Sub CREATE_CONTROL_BUTTONS()
     CREATE_UPDATE_BUTTON
-    CREATE_REPLACE_BUTTON
+    CREATE_REFLECT_BUTTON
 End Sub
 Private Function CREATE_UPDATE_BUTTON()     ' 一覧情報更新ボタン
     Dim updateBtn As Variant
     Set updateBtn = CONTROL_SHEET.Buttons.Add(0, 0, 80, 25)
     updateBtn.OnAction = "UPDATE_CONTROL_LIST"
+    updateBtn.name = "__MFCTRL_UPDATELIST"
     updateBtn.Characters.Text = "情報更新"
     With updateBtn.Characters(Start:=1, Length:=3).Font
         .name = "Meiryo UI"
@@ -201,12 +218,13 @@ Private Function CREATE_UPDATE_BUTTON()     ' 一覧情報更新ボタン
     End With
     Set CREATE_UPDATE_BUTTON = updateBtn
 End Function
-Private Function CREATE_REPLACE_BUTTON()     ' 作成・置換ボタン
-    Dim replaceBtn As Variant
-    Set replaceBtn = CONTROL_SHEET.Buttons.Add(100, 0, 80, 25)
-    replaceBtn.OnAction = "REFLECT_AUTOSHAPE"
-    replaceBtn.Characters.Text = "作成・置換"
-    With replaceBtn.Characters(Start:=1, Length:=3).Font
+Private Function CREATE_REFLECT_BUTTON()     ' 作成・置換ボタン
+    Dim reflectBtn As Variant
+    Set reflectBtn = CONTROL_SHEET.Buttons.Add(100, 0, 80, 25)
+    reflectBtn.OnAction = "REFLECT_AUTOSHAPE"
+    reflectBtn.name = "__MFCTRL_UPDATELIST"
+    reflectBtn.Characters.Text = "作成・置換"
+    With reflectBtn.Characters(Start:=1, Length:=3).Font
         .name = "Meiryo UI"
         .FontStyle = "標準"
         .Size = 11
@@ -218,17 +236,88 @@ Private Function CREATE_REPLACE_BUTTON()     ' 作成・置換ボタン
         .Underline = xlUnderlineStyleNone
         .ColorIndex = 1
     End With
-    Set CREATE_REPLACE_BUTTON = replaceBtn
+    Set CREATE_REFLECT_BUTTON = reflectBtn
 End Function
 
 
+' ==============================
+' 管理表に配置している各ボタンの処理定義
+' ==============================
 
-' 図形を収集して、管理表に反映させる
+' 情報収集ボタン
 Public Sub UPDATE_CONTROL_LIST()
-    COLLECT_AUTOSHAPE
+    ' キャッシュオブジェクトを更新して、図形情報から一覧表に反映させる
+    Call mf_shp_service.CacheAutoShapeMap(mf_autoshape_map)
+    
+    Call REFLECT_TO_LIST(mf_autoshape_map)
 End Sub
-Public Sub COLLECT_AUTOSHAPE(Optional collectName As String)
-    MsgBox "図形収集処理：未実装"
+Public Sub REFLECT_TO_LIST(mf_autoshape_map As Object)
+    Dim maxRow As Long
+    maxRow = mf_autoshape_map.Count
+    'maxRow = MF_ROW_TAILINCOLUMN(CONTROL_SHEET.Cells(1, NAME_COL))
+
+    ' 雛形図形以外の情報を２次元配列で保持する
+    Dim CONTROL_LIST_EXCLUDE_SHAPE() As Variant
+    ReDim CONTROL_LIST_EXCLUDE_SHAPE(1 To maxRow, NAME_COL To SUBHYPERLINK_COL)
+    ' 雛形図形列は、(1,MaxRow)の２次元配列で保持する
+    Dim TEMPLATE_SHAPE_LIST() As Variant
+    ReDim TEMPLATE_SHAPE_LIST(1 To maxRow, 1 To 1)
+        
+    ' 各２次元配列を反映させるためのRangeオブジェクト
+    Dim CONTROL_LIST_RANGE_EXCLUDE_SHAPE As Range
+    Set CONTROL_LIST_RANGE_EXCLUDE_SHAPE = CONTROL_SHEET.Range(CONTROL_SHEET.Cells(READ_ROW, NAME_COL), CONTROL_SHEET.Cells(maxRow, SUBHYPERLINK_COL))
+    Dim TAMPLATE_SHAPE_LIST_RANGE As Range
+    Set TAMPLATE_SHAPE_LIST_RANGE = CONTROL_SHEET.Range(CONTROL_SHEET.Cells(READ_ROW, TEMPLATE_AUTOSHAPE_COL), CONTROL_SHEET.Cells(maxRow, TEMPLATE_AUTOSHAPE_COL))
+    
+    ' Shapeオブジェクトを取得して、
+    ' そのプロパティは文字列として２次元配列へ
+    ' 図形オブジェクト自体は、図形としての２次元配列へ格納する
+    Dim mf_shp As MF_SHAPE_DATA
+    Dim shp As Shape
+    Dim copyShp As Shape
+    Dim template_shape_cell As Range
+    Dim itemlist() As Variant
+    itemlist = mf_autoshape_map.Items
+    Dim dicLoop As Long
+    Dim readrow As Long
+    
+    ' 更新対象範囲のセルと、図形を一括でクリアする
+    CONTROL_LIST_RANGE_EXCLUDE_SHAPE.ClearContents
+    Call DELETE_SHAPE_IN_RANGE(TAMPLATE_SHAPE_LIST_RANGE)
+    
+    On Error Resume Next
+    For dicLoop = 1 To mf_autoshape_map.Count
+        
+        Set mf_shp = itemlist(dicLoop)(0)
+        Set shp = mf_shp.GET_SHAPE
+        CONTROL_LIST_EXCLUDE_SHAPE(dicLoop, NAME_COL) = shp.name
+
+        CONTROL_LIST_EXCLUDE_SHAPE(dicLoop, CONTENT_COL) = shp.TEXTFRAME2.TextRange.Characters.Text
+        CONTROL_LIST_EXCLUDE_SHAPE(dicLoop, HYPERLINK_COL) = shp.hyperlink.Address
+        CONTROL_LIST_EXCLUDE_SHAPE(dicLoop, SUBHYPERLINK_COL) = shp.hyperlink.SubAddress
+        
+        readrow = READ_ROW - 1 + dicLoop
+        Set template_shape_cell = CONTROL_SHEET.Cells(readrow, TEMPLATE_AUTOSHAPE_COL)
+        shp.Copy
+        template_shape_cell.Select
+        CONTROL_SHEET.Paste
+        With Selection
+            .name = shp.name
+            .TEXTFRAME2.TextRange.Characters.Text = shp.TEXTFRAME2.TextRange.Characters.Text
+            '.Top = template_shape_cell.Top
+            '.Left = template_shape_cell.Left
+            .Width = 50
+            .Height = 35
+        End With
+        
+        TEMPLATE_SHAPE_LIST(dicLoop, 1) = Selection
+    Next dicLoop
+On Error GoTo 0
+    
+    ' 一覧表に反映
+    CONTROL_LIST_RANGE_EXCLUDE_SHAPE.Value = CONTROL_LIST_EXCLUDE_SHAPE
+    
+    MsgBox "図形収集処理完了"
 End Sub
 
 ' 管理表に設定されている図形情報を更新 または 新規作成する。

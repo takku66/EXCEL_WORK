@@ -84,6 +84,27 @@ Public Sub SHOW_MF_HELP()
     MF_HELP.Show
 End Sub
 
+Public Sub DELETE_SHAPE_IN_RANGE(Optional targetRange As Range)
+    Dim shp As Shape
+    Dim shprng As Range
+    Dim trng As Range
+    Set trng = targetRange
+    If targetRange Is Nothing Then
+        Set trng = Selection
+    End If
+    
+    'シート内の図形をループ
+    For Each shp In ActiveSheet.Shapes
+        '図形の左上と右下のセル範囲を格納
+        Set shprng = Range(shp.TopLeftCell, shp.BottomRightCell)
+        '図形のセル範囲と、選択したセルの範囲が、重なっているかを判定
+        If Not Intersect(shprng, trng) Is Nothing Then
+            shp.Delete '図形を削除
+        End If
+    Next
+End Sub
+
+
 '=============================================
 
 
