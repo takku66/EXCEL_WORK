@@ -246,15 +246,14 @@ End Function
 
 ' 情報収集ボタン
 Public Sub UPDATE_CONTROL_LIST()
+    CLEAR_CONTROL_LIST
     ' キャッシュオブジェクトを更新して、図形情報から一覧表に反映させる
     Call mf_shp_service.CacheAutoShapeMap(mf_autoshape_map)
-    
     Call REFLECT_TO_LIST(mf_autoshape_map)
 End Sub
 Public Sub REFLECT_TO_LIST(mf_autoshape_map As Object)
     Dim maxRow As Long
-    maxRow = mf_autoshape_map.Count
-    'maxRow = MF_ROW_TAILINCOLUMN(CONTROL_SHEET.Cells(1, NAME_COL))
+    maxRow = mf_autoshape_map.Count + READ_ROW
 
     ' 雛形図形以外の情報を２次元配列で保持する
     Dim CONTROL_LIST_EXCLUDE_SHAPE() As Variant
@@ -281,12 +280,8 @@ Public Sub REFLECT_TO_LIST(mf_autoshape_map As Object)
     Dim dicLoop As Long
     Dim readrow As Long
     
-    ' 更新対象範囲のセルと、図形を一括でクリアする
-    CONTROL_LIST_RANGE_EXCLUDE_SHAPE.ClearContents
-    Call DELETE_SHAPE_IN_RANGE(TAMPLATE_SHAPE_LIST_RANGE)
-    
     On Error Resume Next
-    For dicLoop = 1 To mf_autoshape_map.Count
+    For dicLoop = 1 To mf_autoshape_map.Count - 1
         
         Set mf_shp = itemlist(dicLoop)(0)
         Set shp = mf_shp.GET_SHAPE
@@ -373,3 +368,14 @@ Public Function SHAPE_INCELL(cell As Range) As Shape
     Next
 End Function
 
+Public Sub CLEAR_CONTROL_LIST()
+    ' 更新対象範囲のセルと、図形を一括でクリアする
+    Dim lastRow As Long
+    lastRow = MF_ROW_TAILINCOLUMN(CONTROL_SHEET.Cells(1, NAME_COL))
+    If lastRow > READ_ROW Then
+        Dim deleteRange As Range
+        Set deleteRange = CONTROL_SHEET.Range(CONTROL_SHEET.Cells(READ_ROW, NAME_COL), CONTROL_SHEET.Cells(lastRow, TEMPLATE_AUTOSHAPE_COL))
+        deleteRange.ClearContents
+        Call DELETE_SHAPE_IN_RANGE(deleteRange)
+    End If
+End Sub

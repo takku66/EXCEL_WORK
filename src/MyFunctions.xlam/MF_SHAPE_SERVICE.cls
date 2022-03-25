@@ -66,7 +66,7 @@ Public Sub CacheAutoShapeMap(mf_autoshape_map As Object)
         
             name = shp.name
             If name Like "__MFCTRL_*" Then
-                Continue
+                GoTo Continue
             End If
             
             Set mf_shp = New MF_SHAPE_DATA
