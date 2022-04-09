@@ -32,14 +32,27 @@ Const CONTENT_COL = 2
 Const HYPERLINK_COL = 3
 Const SUBHYPERLINK_COL = 4
 Const TEMPLATE_AUTOSHAPE_COL = 5
-Const READ_ROW = 4
+Const READ_ROW = 5
 Const TITLE_ROW = READ_ROW - 1
+
+' 絞り込み
+Const FILTER_BOX_TITLE_COL = 1
+Const FILTER_BOX_VALUE_COL = 2
+Const FILTER_BOX_ROW = 2
+
+' 除外文字列
+Const EXCLUDE_STR_TITLE_COL = 1
+Const EXCLUDE_STR_VALUE_COL = 2
+Const EXCLUDE_STR_ROW = 3
 
 Const NAME_TITLE = "図形名"
 Const CONTENT_TITLE = "入力値"
 Const HYPERLINK_TITLE = "他ブックへのハイパーリンク"
 Const SUBHYPERLINK_TITLE = "同ブック内のハイパーリンク"
 Const TEMPLATE_AUTOSHAPE_TITLE = "雛形図形"
+
+Const FILTER_BOX_TITLE = "絞り込み"
+Const EXCLUDE_STR_TITLE = "除外文字"
 
 ' デフォルトの管理シート名
 Const DEFAULT_CONTROL_SHEETNAME = "_ASCSHT_"
@@ -120,6 +133,9 @@ Private Sub CREATE_CONTROL_LIST()
     CONTROL_SHEET.Cells(TITLE_ROW, HYPERLINK_COL).Value = HYPERLINK_TITLE
     CONTROL_SHEET.Cells(TITLE_ROW, SUBHYPERLINK_COL).Value = SUBHYPERLINK_TITLE
     CONTROL_SHEET.Cells(TITLE_ROW, TEMPLATE_AUTOSHAPE_COL).Value = TEMPLATE_AUTOSHAPE_TITLE
+    CONTROL_SHEET.Cells(FILTER_BOX_ROW, FILTER_BOX_TITLE_COL).Value = FILTER_BOX_TITLE
+    CONTROL_SHEET.Cells(EXCLUDE_STR_ROW, EXCLUDE_STR_TITLE_COL).Value = EXCLUDE_STR_TITLE
+    
     Columns(NAME_COL).ColumnWidth = 15
     Columns(CONTENT_COL).ColumnWidth = 30
     Columns(HYPERLINK_COL).ColumnWidth = 50
@@ -246,9 +262,19 @@ End Function
 
 ' 情報収集ボタン
 Public Sub UPDATE_CONTROL_LIST()
+    Dim answer As Integer
+    answer = MsgBox("編集中の情報は破棄されます。続けますか？", vbOKCancel)
+    If answer = vbCancel Then
+        Exit Sub
+    End If
+    
     CLEAR_CONTROL_LIST
     ' キャッシュオブジェクトを更新して、図形情報から一覧表に反映させる
-    Call mf_shp_service.CacheAutoShapeMap(mf_autoshape_map)
+    Dim filterWord As String
+    filterWord = CONTROL_SHEET.Cells(FILTER_BOX_ROW, FILTER_BOX_VALUE_COL).Value
+    Dim excludeWord As String
+    excludeWord = CONTROL_SHEET.Cells(EXCLUDE_STR_ROW, EXCLUDE_STR_VALUE_COL).Value
+    Call mf_shp_service.CacheAutoShapeMap(mf_autoshape_map, filterWord, excludeWord)
     Call REFLECT_TO_LIST(mf_autoshape_map)
 End Sub
 Public Sub REFLECT_TO_LIST(mf_autoshape_map As Object)
@@ -281,28 +307,28 @@ Public Sub REFLECT_TO_LIST(mf_autoshape_map As Object)
     Dim readrow As Long
     
     On Error Resume Next
-    For dicLoop = 1 To mf_autoshape_map.Count - 1
+    For dicLoop = 1 To mf_autoshape_map.Count
         
-        Set mf_shp = itemlist(dicLoop)(0)
+        Set mf_shp = itemlist(dicLoop - 1)(0)
         Set shp = mf_shp.GET_SHAPE
         CONTROL_LIST_EXCLUDE_SHAPE(dicLoop, NAME_COL) = shp.name
 
-        CONTROL_LIST_EXCLUDE_SHAPE(dicLoop, CONTENT_COL) = shp.TEXTFRAME2.TextRange.Characters.Text
+        CONTROL_LIST_EXCLUDE_SHAPE(dicLoop, CONTENT_COL) = shp.TextFrame2.TextRange.Characters.Text
         CONTROL_LIST_EXCLUDE_SHAPE(dicLoop, HYPERLINK_COL) = shp.hyperlink.Address
         CONTROL_LIST_EXCLUDE_SHAPE(dicLoop, SUBHYPERLINK_COL) = shp.hyperlink.SubAddress
         
-        readrow = READ_ROW - 1 + dicLoop
+        readrow = READ_ROW + dicLoop - 1
         Set template_shape_cell = CONTROL_SHEET.Cells(readrow, TEMPLATE_AUTOSHAPE_COL)
         shp.Copy
         template_shape_cell.Select
         CONTROL_SHEET.Paste
         With Selection
             .name = shp.name
-            .TEXTFRAME2.TextRange.Characters.Text = shp.TEXTFRAME2.TextRange.Characters.Text
+            .TextFrame2.TextRange.Characters.Text = shp.TextFrame2.TextRange.Characters.Text
             '.Top = template_shape_cell.Top
             '.Left = template_shape_cell.Left
-            .Width = 50
-            .Height = 35
+            .Width = 120
+            .Height = 38
         End With
         
         TEMPLATE_SHAPE_LIST(dicLoop, 1) = Selection
@@ -342,8 +368,13 @@ Public Sub REFLECT_AUTOSHAPE()
         Set template = SHAPE_INCELL(CONTROL_SHEET.Cells(loopCnt, TEMPLATE_AUTOSHAPE_COL))
         
         Call mf_shp_service.CacheAutoShapeMap(mf_autoshape_map)
-        Call mf_shp_service.CREATE_MFSHAPE(mf_autoshape_map, CONTROL_SHEET, name, content, hyperlink, subhyperlink, template)
         
+        If template Is Nothing Then
+            MsgBox "[ " & name & " ] の雛形図形が存在しません。　行：" & loopCnt
+            GoTo Continue
+        End If
+        Call mf_shp_service.CREATE_MFSHAPE(mf_autoshape_map, CONTROL_SHEET, name, content, hyperlink, subhyperlink, template)
+Continue:
     Next loopCnt
 End Sub
 
@@ -372,7 +403,7 @@ Public Sub CLEAR_CONTROL_LIST()
     ' 更新対象範囲のセルと、図形を一括でクリアする
     Dim lastRow As Long
     lastRow = MF_ROW_TAILINCOLUMN(CONTROL_SHEET.Cells(1, NAME_COL))
-    If lastRow > READ_ROW Then
+    If lastRow >= READ_ROW Then
         Dim deleteRange As Range
         Set deleteRange = CONTROL_SHEET.Range(CONTROL_SHEET.Cells(READ_ROW, NAME_COL), CONTROL_SHEET.Cells(lastRow, TEMPLATE_AUTOSHAPE_COL))
         deleteRange.ClearContents

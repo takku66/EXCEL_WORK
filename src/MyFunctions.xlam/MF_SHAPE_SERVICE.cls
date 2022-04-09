@@ -36,6 +36,7 @@ Public Sub CREATE_MFSHAPE(autoshapeMap As Object, reflectSht As Worksheet, name 
         Call mf_shp.SET_SUBHYPERLINK(subhyperlink)
         
         Set mf_shp = REFLECT_SHAPE(mf_shp, template)
+        
     Next mf_shp
 
 End Sub
@@ -52,7 +53,7 @@ End Function
 
 
 
-Public Sub CacheAutoShapeMap(mf_autoshape_map As Object)
+Public Sub CacheAutoShapeMap(mf_autoshape_map As Object, Optional filterWord As String, Optional excludePrefix As String)
     Dim sht As Worksheet
     Dim shp As Shape
     Dim mf_shp As MF_SHAPE_DATA
@@ -60,12 +61,23 @@ Public Sub CacheAutoShapeMap(mf_autoshape_map As Object)
     
     Set mf_autoshape_map = CreateObject("Scripting.Dictionary")
     
+    ' 除外・絞り込み文字列の正規表現パターンを設定
+    Dim excludePattern As String
+    Dim filterPattern As String
+    excludePattern = excludePrefix
+    filterPattern = filterWord
+    
     Dim name As String
     For Each sht In ActiveWorkbook.Sheets
         For Each shp In sht.Shapes
         
             name = shp.name
-            If name Like "__MFCTRL_*" Then
+            If excludePrefix <> "" And name Like excludePattern Then
+                GoTo Continue
+            End If
+            
+            ' 検索ワードが空の場合か、検索ワードにヒットした場合のみ、図形をキャッシュする
+            If filterWord <> "" And Not (name Like filterPattern) Then
                 GoTo Continue
             End If
             
@@ -98,7 +110,7 @@ Private Function REFLECT_SHAPE(mf_shp As Variant, template As Shape)
         Set copyShp = template.Duplicate
         With copyShp
             .name = mf_shp.GET_NAME
-            .TEXTFRAME2.TextRange.Characters.Text = mf_shp.GET_CONTENT
+            .TextFrame2.TextRange.Characters.Text = mf_shp.GET_CONTENT
             .Top = 0
             .Left = 400
             .Width = 100
@@ -108,7 +120,7 @@ Private Function REFLECT_SHAPE(mf_shp As Variant, template As Shape)
         ' 更新
         Set copyShp = mf_shp.GET_SHAPE
         With copyShp
-            .TEXTFRAME2.TextRange.Characters.Text = mf_shp.GET_CONTENT
+            .TextFrame2.TextRange.Characters.Text = mf_shp.GET_CONTENT
         End With
     End If
     
